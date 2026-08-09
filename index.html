@@ -1,1 +1,1892 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0c0c0e">
+<title>Painel de Controle</title>
+<style>
+  :root{
+    --fonte: Arial, Helvetica, sans-serif;
+    --bg-pagina:#0c0c0e;
+    --bg-painel:#1b1b1f;
+    --bg-coluna:#151517;
+    --borda-painel: rgba(255,255,255,.12);
+    --texto-claro:#e9e9ec;
+    --texto-fraco:#8f8f97;
+    color-scheme: dark;
+  }
 
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100vh;
+    padding:clamp(10px,2.2vw,26px);
+    background:var(--bg-pagina);
+    font-family:var(--fonte);
+    color:var(--texto-claro);
+    -webkit-font-smoothing:antialiased;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .sr-only{
+    position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+  }
+
+  /* ---------- painel ---------- */
+  .painel{
+    width:100%; max-width:1680px; margin:0 auto;
+    background:var(--bg-painel);
+    border:1px solid var(--borda-painel);
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 26px 60px -20px rgba(0,0,0,.75);
+    display:flex; flex-direction:column;
+    flex:1; min-height:0;
+  }
+
+  /* ---------- barra de abas (navegação de páginas) ---------- */
+  .barra-abas{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.08);
+    background:#161619; flex:none;
+  }
+  .marca{
+    font:800 14px/1 var(--fonte); letter-spacing:.14em; text-transform:uppercase;
+    color:#e9e9ec; margin-right:6px; white-space:nowrap;
+  }
+  .marca span{ color:#F0C230; }
+  .abas{ display:flex; gap:6px; flex-wrap:wrap; flex:1; }
+  .aba{
+    display:flex; align-items:center; gap:7px;
+    padding:9px 15px; border-radius:9px;
+    background:#232327; border:1px solid #34343a;
+    color:#c7c7cd; font:700 12px/1 var(--fonte); letter-spacing:.03em;
+    cursor:pointer; transition:.14s; white-space:nowrap;
+  }
+  .aba .ico{ font-size:14px; line-height:1; }
+  .aba:hover{ background:#2c2c31; color:#e9e9ec; }
+  .aba:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .aba[aria-selected="true"]{
+    background:var(--aba-cor,#F0C230); border-color:var(--aba-cor,#F0C230); color:#171308;
+  }
+  .aba .conta{
+    background:rgba(0,0,0,.18); padding:1px 7px; border-radius:9px;
+    font-variant-numeric:tabular-nums; font-size:11px;
+  }
+  .aba[aria-selected="false"] .conta{ background:rgba(255,255,255,.14); }
+
+  .estado-salvo{
+    display:inline-flex; align-items:center; gap:7px;
+    padding:8px 13px; border-radius:20px;
+    background:#232327; border:1px solid #34343a;
+    color:var(--texto-fraco); font:600 11px/1 var(--fonte); letter-spacing:.03em;
+    white-space:nowrap; user-select:none; transition:color .15s, border-color .15s;
+    font-variant-numeric:tabular-nums;
+  }
+  .estado-salvo::before{
+    content:""; flex:none; width:7px; height:7px; border-radius:50%;
+    background:#57C271; transition:background .15s;
+  }
+  .estado-salvo[data-estado="salvando"]{ color:#d8cfa8; }
+  .estado-salvo[data-estado="salvando"]::before{ background:#F0C230; animation:pulsarSalvo 1s ease-in-out infinite; }
+  .estado-salvo[data-estado="erro"]{ color:#ff9a9f; border-color:#7a2027; background:#2b1b1d; }
+  .estado-salvo[data-estado="erro"]::before{ background:#E5232B; }
+  @keyframes pulsarSalvo{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+
+  /* ---------- área de páginas ---------- */
+  .pagina{ display:none; flex-direction:column; flex:1; min-height:0; }
+  .pagina.ativa{ display:flex; }
+
+  /* ---------- barra de ferramentas (compartilhada) ---------- */
+  .barra-ferr{
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:12px; padding:12px 16px 8px; flex:none;
+  }
+  .ferramentas{
+    display:flex; align-items:center; gap:8px;
+    padding:7px 10px; border-radius:10px;
+    background:#232327; border:1px solid #34343a;
+    transition:opacity .15s;
+  }
+  .ferramentas.inativo{ opacity:.5; }
+  .cores{ display:flex; gap:6px; }
+  .cor{
+    width:22px; height:22px; padding:0; border-radius:50%;
+    border:2px solid rgba(255,255,255,.18);
+    cursor:pointer; transition:transform .12s, box-shadow .12s;
+  }
+  .cor:hover{ transform:scale(1.15); }
+  .cor[aria-pressed="true"]{ box-shadow:0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.55); transform:scale(1.1); }
+  .cor:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .divisor{ width:1px; align-self:stretch; background:rgba(255,255,255,.14); margin:0 2px; }
+  .ferr{
+    display:flex; align-items:center; justify-content:center;
+    min-width:26px; height:26px; padding:0 6px;
+    border:none; border-radius:5px; background:rgba(255,255,255,.08);
+    color:#e9e9ec; font:700 13px/1 var(--fonte); cursor:pointer; transition:.12s;
+  }
+  .ferr:hover{ background:rgba(255,255,255,.18); }
+  .ferr:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .ferr.grande{ font-size:17px; }
+  .ferr.pequeno{ font-size:11px; }
+  .ferr[aria-pressed="true"]{ background:#fff; color:#141414; }
+  .ferr.apagar:hover{ background:#c0392b; color:#fff; }
+  .tam{ min-width:22px; text-align:center; font:700 13px/1 var(--fonte); color:#cfcfd4; font-variant-numeric:tabular-nums; }
+
+  .btn-concluidos{
+    display:flex; align-items:center; gap:7px;
+    padding:8px 14px; border-radius:20px;
+    background:#232327; border:1px solid #34343a;
+    color:#e9e9ec; font:700 12px/1 var(--fonte); letter-spacing:.04em; text-transform:uppercase;
+    cursor:pointer; transition:.12s;
+  }
+  .btn-concluidos:hover{ background:#2c2c31; }
+  .btn-concluidos:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .contagem{ background:rgba(255,255,255,.15); padding:1px 7px; border-radius:10px; font-variant-numeric:tabular-nums; }
+
+  .dica{ margin:0; padding:0 16px 10px; font:500 12px/1.4 var(--fonte); color:var(--texto-fraco); flex:none; }
+  .dica strong{ color:#cfcfd4; }
+
+  /* ---------- colunas (grade genérica) ---------- */
+  .quadro{ display:flex; flex-direction:column; flex:1; min-height:0; }
+  .quadro[hidden]{ display:none; }
+
+  .colunas{
+    display:grid; gap:16px; padding:4px 16px 18px;
+    flex:1; min-height:0;
+  }
+  .cols-3{ grid-template-columns:repeat(3,1fr); grid-template-rows:1fr; }
+  .cols-4{ grid-template-columns:repeat(4,1fr); grid-template-rows:1fr; }
+  .coluna{
+    border:1.5px solid var(--acento);
+    border-radius:9px; overflow:hidden;
+    background:var(--bg-coluna);
+    display:flex; flex-direction:column;
+    min-height:0;
+  }
+  .cabecalho-coluna{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 12px; background:var(--acento); flex:none;
+  }
+  .titulo-coluna{
+    font:700 15px/1.15 var(--fonte); letter-spacing:.09em; text-transform:uppercase;
+    color:#171308; outline:none; min-width:20px; overflow-wrap:anywhere;
+  }
+  .titulo-coluna:focus-visible{ outline:2px dashed rgba(0,0,0,.55); outline-offset:2px; }
+  .icone-coluna{
+    flex:none; width:26px; height:20px; padding:0;
+    border:1.5px solid rgba(0,0,0,.5); border-radius:3px; background:transparent;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    cursor:pointer;
+  }
+  .icone-coluna span{ width:14px; height:2px; background:rgba(0,0,0,.55); border-radius:1px; }
+  .icone-coluna:hover{ background:rgba(0,0,0,.08); }
+  .icone-coluna:focus-visible{ outline:2px solid #141414; outline-offset:1px; }
+
+  .grade{
+    display:grid; grid-template-columns:repeat(2,1fr);
+    gap:10px; padding:12px; align-content:start; min-height:70px;
+    flex:1; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.25) transparent;
+  }
+  .grade.grade-1{ grid-template-columns:1fr; }
+  .grade::-webkit-scrollbar{ width:8px; }
+  .grade::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:4px; }
+  .grade::-webkit-scrollbar-track{ background:transparent; }
+  @media (max-width:520px){ .grade{ grid-template-columns:1fr; } }
+
+  .vazia{
+    grid-column:1 / -1; padding:6px 4px; text-align:center;
+    font:500 12px/1.4 var(--fonte); color:rgba(255,255,255,.35);
+  }
+
+  /* ---------- cartão base ---------- */
+  .cartao{
+    position:relative; display:flex; flex-direction:column; justify-content:space-between;
+    min-height:108px; padding:10px 10px 8px; border-radius:7px;
+    background:var(--cor-fundo,#F4C430); color:var(--cor-texto,#241D06);
+    box-shadow:0 1px 2px rgba(0,0,0,.4);
+    cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+    animation:surgirCartao .2s ease backwards;
+  }
+  @keyframes surgirCartao{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+  .cartao:hover{ transform:translateY(-2px); box-shadow:0 6px 14px -4px rgba(0,0,0,.5); }
+  .cartao.selecionado{ box-shadow:0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.45); }
+  .cartao.vencido{ box-shadow:0 0 0 2px rgba(255,255,255,.55), 0 0 0 4px rgba(215,38,61,.4), 0 0 16px rgba(215,38,61,.55); }
+  .cartao.editando{ cursor:text; }
+  .cartao:focus-visible{ outline:3px solid #fff; outline-offset:2px; }
+
+  .alca{
+    position:absolute; top:5px; right:8px; font-size:14px; line-height:1;
+    opacity:.4; cursor:grab; user-select:none;
+  }
+  .alca:active{ cursor:grabbing; }
+
+  /* campo cliente destacado */
+  .campo-cliente{
+    font-family:var(--fonte); font-weight:800; font-size:13px; letter-spacing:.06em;
+    text-transform:uppercase; line-height:1.2; outline:none;
+    padding:0 26px 5px 0; margin-bottom:2px;
+    border-bottom:1.5px solid rgba(0,0,0,.28); min-height:1.2em; word-break:break-word;
+  }
+  .cartao.escuro .campo-cliente{ border-bottom-color:rgba(255,255,255,.4); }
+  .campo-cliente:empty::before{ content:"CLIENTE"; opacity:.5; }
+  .campo-cliente:focus-visible{ outline:none; }
+
+  .texto{
+    flex:1; font-family:var(--fonte); font-size:var(--fs,15px); line-height:1.32;
+    white-space:pre-wrap; word-break:break-word; outline:none; margin-top:6px; min-height:1.3em;
+  }
+  .texto:empty::before{ content:"Escreva aqui…"; opacity:.55; font-style:italic; }
+  .texto[data-ph]:empty::before{ content:attr(data-ph); }
+  .texto.negrito{ font-weight:700; }
+
+  /* linha de data */
+  .linha-data{ display:flex; align-items:center; gap:4px; margin-top:8px; font-size:11px; opacity:.9; cursor:pointer; }
+  .campo-data{
+    font-family:var(--fonte); font-size:11px; background:transparent; border:none;
+    color:inherit; padding:0; cursor:pointer; max-width:120px;
+  }
+  .campo-data:focus-visible{ outline:2px solid currentColor; outline-offset:2px; }
+  .cartao.escuro .campo-data::-webkit-calendar-picker-indicator{ filter:invert(1) brightness(1.7); }
+  .rotulo-data{ font-weight:700; letter-spacing:.04em; opacity:.85; }
+  .selo-atrasado{
+    display:none; font:700 9px/1 var(--fonte); letter-spacing:.06em; text-transform:uppercase;
+    background:rgba(0,0,0,.3); padding:2px 6px; border-radius:10px; margin-left:2px;
+  }
+  .cartao.escuro .selo-atrasado{ background:rgba(255,255,255,.25); }
+  .cartao.vencido .selo-atrasado{ display:inline-block; }
+
+  /* botão IR (link) */
+  .linha-link{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .campo-link{
+    flex:1; min-width:0; font-family:var(--fonte); font-size:11px;
+    background:rgba(0,0,0,.14); border:1px solid rgba(0,0,0,.22); border-radius:5px;
+    color:inherit; padding:4px 7px;
+  }
+  .cartao.escuro .campo-link{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.22); }
+  .campo-link::placeholder{ color:currentColor; opacity:.5; }
+  .campo-link:focus-visible{ outline:2px solid currentColor; outline-offset:1px; }
+  .btn-ir{
+    flex:none; display:flex; align-items:center; gap:3px;
+    padding:5px 11px; border-radius:5px; border:none;
+    background:#171308; color:#F0C230; font:800 11px/1 var(--fonte); letter-spacing:.08em;
+    cursor:pointer; text-transform:uppercase; text-decoration:none; transition:.12s;
+  }
+  .btn-ir:hover{ background:#000; }
+  .btn-ir.inativo{ opacity:.35; pointer-events:none; }
+  .cartao.escuro .btn-ir{ background:#fff; color:#171308; }
+
+  /* aviso quando o navegador bloqueia abrir uma pasta local */
+  .aviso-caminho{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    max-width:min(560px,92vw); z-index:2000;
+    background:#232327; border:1px solid #4a4a52; border-radius:12px;
+    padding:14px 18px; box-shadow:0 24px 50px -16px rgba(0,0,0,.8);
+    color:#e9e9ec; font:500 13px/1.5 var(--fonte);
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+  }
+  .aviso-caminho.ativo{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+  .aviso-caminho strong{ color:#F0C230; }
+  .aviso-caminho .cam{
+    display:inline-block; margin-top:7px; padding:4px 9px; border-radius:6px;
+    background:#151517; border:1px solid #3a3a40; color:#cfcfd4;
+    font:600 12px/1.4 "Consolas","Courier New",monospace; word-break:break-all;
+  }
+
+  .adicionar{
+    grid-column:1 / -1; display:flex; align-items:center; justify-content:center; gap:6px;
+    min-height:44px; border:2px dashed rgba(255,255,255,.16); border-radius:7px; background:transparent;
+    color:rgba(255,255,255,.42); font:700 12px/1 var(--fonte); letter-spacing:.05em; text-transform:uppercase;
+    cursor:pointer; transition:.15s;
+  }
+  .adicionar:hover{ border-color:rgba(255,255,255,.4); color:rgba(255,255,255,.8); background:rgba(255,255,255,.03); }
+  .adicionar:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+
+  /* ---------- página 2: status de pedidos (etapas) ---------- */
+  .etapas{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:2px; margin-top:10px;
+  }
+  .etapa{ flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; position:relative; }
+  .etapa .bolinha{
+    width:15px; height:15px; border-radius:50%;
+    border:2px solid currentColor; background:transparent; opacity:.4;
+    transition:.15s; cursor:pointer;
+  }
+  .etapa.feita .bolinha{ background:currentColor; opacity:1; }
+  .etapa.atual .bolinha{ opacity:1; box-shadow:0 0 0 3px rgba(0,0,0,.18); }
+  .cartao.escuro .etapa.atual .bolinha{ box-shadow:0 0 0 3px rgba(255,255,255,.28); }
+  .etapa .rotulo{ font:800 8.5px/1.1 var(--fonte); letter-spacing:.04em; text-transform:uppercase; text-align:center; opacity:.5; }
+  .etapa.feita .rotulo, .etapa.atual .rotulo{ opacity:1; }
+  .etapa .quando{
+    font-family:var(--fonte); font-size:9px; background:transparent; border:none;
+    color:inherit; text-align:center; width:100%; padding:0; cursor:pointer; opacity:.85;
+  }
+  .etapa .quando:focus-visible{ outline:1px solid currentColor; }
+  .linha-conector{
+    position:absolute; top:7px; left:50%; width:100%; height:2px;
+    background:currentColor; opacity:.3; z-index:0;
+  }
+  .etapa:last-child .linha-conector{ display:none; }
+  .etapa.feita .linha-conector{ opacity:.8; }
+  .etapa .bolinha, .etapa .rotulo, .etapa .quando{ position:relative; z-index:1; }
+
+  .linha-entrega{
+    display:flex; align-items:center; gap:6px; margin-top:9px;
+    padding-top:7px; border-top:1.5px solid rgba(0,0,0,.2);
+    font-size:11px; cursor:pointer;
+  }
+  .cartao.escuro .linha-entrega{ border-top-color:rgba(255,255,255,.28); }
+  .linha-entrega .rot{ font-weight:800; letter-spacing:.05em; text-transform:uppercase; opacity:.85; }
+  .campo-entrega{
+    font-family:var(--fonte); font-size:11px; font-weight:700; background:transparent; border:none;
+    color:inherit; padding:0; cursor:pointer; max-width:130px;
+  }
+  .campo-entrega:focus-visible{ outline:2px solid currentColor; outline-offset:2px; }
+
+  /* ---------- página 3: notas livres (posicionamento livre) ---------- */
+  .mural{
+    position:relative; flex:1; min-height:0; margin:4px 16px 18px;
+    border-radius:9px; border:1.5px dashed rgba(255,255,255,.14);
+    background:
+      radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:26px 26px;
+    overflow:auto;
+    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.25) transparent;
+  }
+  .mural::-webkit-scrollbar{ width:9px; height:9px; }
+  .mural::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:5px; }
+  .lona{ position:relative; width:1600px; height:1000px; }
+  .nota-livre{
+    position:absolute; width:220px; height:150px; min-width:180px; min-height:110px;
+    padding:12px 12px 10px; border-radius:8px;
+    background:var(--cor-fundo,#F4C430); color:var(--cor-texto,#241D06);
+    box-shadow:0 6px 16px -6px rgba(0,0,0,.6);
+    display:flex; flex-direction:column;
+    animation:surgirCartao .2s ease backwards;
+  }
+  .nota-livre.selecionado{ box-shadow:0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.45), 0 6px 16px -6px rgba(0,0,0,.6); }
+  .nota-livre.redimensionando{ animation:none; }
+  .nota-livre .alca{ font-size:15px; flex:none; }
+  .nota-livre .campo-cliente{ margin-bottom:4px; flex:none; }
+  .nota-livre .conteudo-livre{
+    flex:1; min-height:0; display:flex; flex-direction:column; gap:8px;
+    overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(0,0,0,.3) transparent;
+  }
+  .nota-livre .conteudo-livre::-webkit-scrollbar{ width:7px; }
+  .nota-livre .conteudo-livre::-webkit-scrollbar-thumb{ background:rgba(0,0,0,.28); border-radius:4px; }
+  .nota-livre.escuro .conteudo-livre::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.28); }
+  .nota-livre .texto{ margin-top:0; flex:none; white-space:pre-wrap; word-break:break-word; }
+
+  /* ---------- imagens coladas nas notas ---------- */
+  .imagens-nota{ display:flex; flex-direction:column; gap:8px; flex:none; }
+  .imagens-nota .item-imagem{ position:relative; border-radius:6px; overflow:hidden; }
+  .imagens-nota img{ display:block; width:100%; border-radius:6px; }
+  .btn-remover-imagem{
+    position:absolute; top:5px; right:5px; width:22px; height:22px; border-radius:50%;
+    border:none; background:rgba(0,0,0,.55); color:#fff; font-size:13px; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .12s;
+  }
+  .item-imagem:hover .btn-remover-imagem{ opacity:1; }
+  .btn-remover-imagem:hover{ background:#c0392b; }
+
+  /* ---------- alça de redimensionar (canto inferior direito) ---------- */
+  .alca-redimensionar{
+    position:absolute; right:2px; bottom:2px; width:17px; height:17px;
+    cursor:nwse-resize; flex:none; touch-action:none;
+    background:
+      linear-gradient(135deg, transparent 0 45%, currentColor 45% 55%, transparent 55% 100%),
+      linear-gradient(135deg, transparent 0 65%, currentColor 65% 75%, transparent 75% 100%);
+    opacity:.38; transition:opacity .12s;
+  }
+  .alca-redimensionar:hover, .nota-livre.redimensionando .alca-redimensionar{ opacity:.85; }
+
+  /* ---------- arraste ---------- */
+  .nota-livre.arrastando-livre{ cursor:grabbing; box-shadow:0 30px 40px -16px rgba(0,0,0,.75); animation:none; transition:none; }
+  .fantasma{ position:fixed; z-index:999; pointer-events:none; margin:0; box-shadow:0 30px 40px -16px rgba(0,0,0,.75); animation:none; }
+  .origem{ display:none !important; }
+  .vaga{ border:2px dashed rgba(255,255,255,.3); background:rgba(255,255,255,.05); border-radius:7px; }
+  body.arrastando{ cursor:grabbing; user-select:none; }
+
+  /* ---------- concluídos ---------- */
+  .tela-concluidos{
+    padding:16px; flex:1; min-height:0;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .tela-concluidos[hidden]{ display:none; }
+  .cabecalho-concluidos{ display:flex; align-items:center; gap:14px; margin-bottom:14px; flex:none; }
+  .gc{
+    flex:1; min-height:0; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.25) transparent;
+  }
+  .gc::-webkit-scrollbar{ width:8px; }
+  .gc::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:4px; }
+  .cabecalho-concluidos h2{ margin:0; font:700 16px/1 var(--fonte); letter-spacing:.06em; text-transform:uppercase; color:#e9e9ec; }
+  .btn-voltar{
+    display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:8px;
+    background:#232327; border:1px solid #34343a; color:#e9e9ec; font:700 12px/1 var(--fonte); cursor:pointer;
+  }
+  .btn-voltar:hover{ background:#2c2c31; }
+  .btn-voltar:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+
+  .grupo-cat{ margin-bottom:22px; }
+  .grupo-cat h3{
+    margin:0 0 10px; padding:6px 12px; border-radius:7px;
+    font:800 12px/1.3 var(--fonte); letter-spacing:.06em; text-transform:uppercase;
+    color:#171308; display:inline-flex; align-items:center; gap:8px;
+  }
+  .grupo-cat h3 .n{ background:rgba(0,0,0,.2); padding:1px 8px; border-radius:9px; }
+  .itens-concluidos{ display:flex; flex-direction:column; gap:8px; }
+  .item-concluido{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border-radius:8px;
+    background:#1f1f23; border:1px solid rgba(255,255,255,.06);
+  }
+  .ponto-cor{ flex:none; width:12px; height:12px; border-radius:50%; margin-top:4px; background:var(--dot,#888); }
+  .conteudo-item{ flex:1; min-width:0; }
+  .cliente-item{ margin:0 0 2px; font:800 12px/1.3 var(--fonte); letter-spacing:.04em; text-transform:uppercase; color:#f4f4f6; }
+  .texto-item{ margin:0; font:500 13px/1.4 var(--fonte); color:#d6d6db; white-space:pre-wrap; word-break:break-word; }
+  .origem-item{ display:inline-block; margin-top:4px; font:600 10px/1 var(--fonte); letter-spacing:.05em; text-transform:uppercase; color:var(--texto-fraco); }
+  .acoes-item{ display:flex; gap:6px; flex:none; }
+  .acoes-item button{
+    width:26px; height:26px; border:none; border-radius:6px; background:rgba(255,255,255,.08);
+    color:#e9e9ec; cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; transition:.12s;
+  }
+  .acoes-item button:hover{ background:rgba(255,255,255,.18); }
+  .acoes-item .btn-excluir-def:hover{ background:#c0392b; color:#fff; }
+  .acoes-item button:focus-visible{ outline:2px solid #fff; outline-offset:2px; }
+  .vazio-concluidos{ padding:30px 10px; text-align:center; color:var(--texto-fraco); font:500 13px/1.4 var(--fonte); }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+
+  /* ---------- telas pequenas ---------- */
+  @media (max-width:900px){
+    body{ min-height:100vh; }
+    .painel{ flex:none; }
+    .pagina{ flex:none; }
+    .quadro{ flex:none; }
+    .cols-3,.cols-4{ grid-template-columns:1fr; grid-template-rows:none; flex:none; }
+    .grade{ flex:none; overflow-y:visible; }
+    .tela-concluidos{ flex:none; overflow:visible; }
+    .gc{ flex:none; overflow-y:visible; }
+    .mural{ height:70vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="painel">
+  <!-- ===================== BARRA DE ABAS ===================== -->
+  <div class="barra-abas" role="tablist" aria-label="Páginas do painel">
+    <span class="marca">PAINEL<span>·</span>CONTROLE</span>
+    <div class="abas" id="abas"></div>
+    <span class="estado-salvo" id="estadoSalvo" data-estado="ok" role="status" aria-live="polite"
+          title="O painel salva sozinho a cada alteração.">Salvo</span>
+  </div>
+
+  <!-- páginas injetadas via JS -->
+  <div id="areaPaginas" style="display:flex;flex-direction:column;flex:1;min-height:0;"></div>
+</div>
+
+<script>
+/* ============================================================
+   PAINEL DE CONTROLE — 5 páginas
+   Conceito herdado de "painel-de-lembretes5.html":
+   mesmas cores, mesmo motor de arraste, mesma persistência
+   dupla (localStorage + window.storage) e indicador "Salvo".
+   ============================================================ */
+(() => {
+  "use strict";
+
+  /* ============ cores dos cartões ============ */
+  const PAPEIS = {
+    amarelo:  { nome:'Amarelo',  bg:'#F4C430', ink:'#241D06' },
+    verde:    { nome:'Verde',    bg:'#93C93E', ink:'#1E3305' },
+    vermelho: { nome:'Vermelho', bg:'#E5232B', ink:'#FFFFFF' },
+    magenta:  { nome:'Magenta',  bg:'#E91E8C', ink:'#FFFFFF' },
+    azul:     { nome:'Azul',     bg:'#7EC8E3', ink:'#0B2F3D' },
+    marinho:  { nome:'Azul-acinzentado', bg:'#5B7FA6', ink:'#FFFFFF' },
+    roxo:     { nome:'Roxo',     bg:'#9B6FD1', ink:'#FFFFFF' },
+    branco:   { nome:'Branco',   bg:'#F2F0EA', ink:'#1A1A1A' }
+  };
+  const VENCIDO = { bg:'#D7263D', ink:'#FFFFFF' };
+  const ACENTOS = {
+    amarelo:'#F0C230', verde:'#1F8B4C', vermelho:'#E5232B',
+    azul:'#4A90D9', roxo:'#9B6FD1', laranja:'#E08A2B', ciano:'#2BB0A8'
+  };
+
+  const FONTE_MIN = 12, FONTE_MAX = 34, FONTE_PASSO = 2;
+  const CHAVE = 'painel-controle:v1';
+
+  /* ============ utilidades ============ */
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const $ = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+  function hojeISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function estaVencido(dataISO) {
+    return !!dataISO && dataISO < hojeISO();
+  }
+  /* Distingue caminho interno (arquivo/pasta local ou de rede) de link web.
+     Retorna { href, interno, exibicao }.
+       - Windows local: C:\Pasta\arquivo  ou  C:/Pasta
+       - Rede (UNC):     \\servidor\compartilhamento\pasta
+       - file:// já pronto
+     Para esses, gera um href file:/// que o Explorer entende. Para o resto,
+     trata como link web (adiciona https:// se faltar). */
+  function analisarLink(u) {
+    if (!u) return { href:'', interno:false, exibicao:'' };
+    u = u.trim();
+    if (!u) return { href:'', interno:false, exibicao:'' };
+
+    // já é file://
+    if (/^file:\/\//i.test(u)) return { href:u, interno:true, exibicao:u };
+
+    // caminho de rede UNC: \\servidor\pasta
+    if (/^\\\\/.test(u)) {
+      const p = u.replace(/\\/g,'/');           // \\srv\pasta -> //srv/pasta
+      return { href:'file:' + p, interno:true, exibicao:u };
+    }
+    // unidade Windows: C:\... ou C:/...
+    if (/^[a-zA-Z]:[\\/]/.test(u)) {
+      const p = u.replace(/\\/g,'/');           // C:\Pasta -> C:/Pasta
+      return { href:'file:///' + p, interno:true, exibicao:u };
+    }
+    // links web / e-mail
+    if (/^https?:\/\//i.test(u) || /^mailto:/i.test(u)) return { href:u, interno:false, exibicao:u };
+    return { href:'https://' + u, interno:false, exibicao:u };
+  }
+  /* mantida por compatibilidade — devolve só o href */
+  function normalizarLink(u) { return analisarLink(u).href; }
+
+  /* ============ definição das páginas ============ */
+  /* tipo do cartão define quais campos ele mostra:
+     - orcamento : cliente + texto + data + link (botão IR) + categoria p/ concluídos
+     - pedido    : cliente + etapas (projeto/produção/instalação) + entrega
+     - nota      : texto simples posicionável (mural livre)
+     - lembrete  : cartão clássico (texto + data)  → página 4
+     - login     : cliente + texto + link (botão IR)  → guardar acessos     */
+
+  const CATEGORIAS = {
+    orcados:            { nome:'Orçados',          cor:'#F0C230' },
+    monitorados:        { nome:'Monitorados',      cor:'#4A90D9' },
+    'tarefas-externas': { nome:'Tarefas externas', cor:'#E08A2B' },
+    'tarefas-internas': { nome:'Tarefas internas', cor:'#2BB0A8' },
+    /* categorias dos pedidos concluídos, pela etapa em que estavam */
+    'pedido-projeto':     { nome:'Concluídos no projeto',     cor:'#9B6FD1' },
+    'pedido-producao':    { nome:'Concluídos na produção',    cor:'#E08A2B' },
+    'pedido-instalacao':  { nome:'Concluídos na instalação',  cor:'#1F8B4C' }
+  };
+
+  const PAGINAS = [
+    { id:'orcamentos', nome:'Orçamentos', ico:'📋', tipo:'orcamento', abaCor:'#F0C230', concluidos:true },
+    { id:'pedidos',    nome:'Pedidos',    ico:'📦', tipo:'pedido',    abaCor:'#4A90D9', concluidos:true },
+    { id:'notas',      nome:'Notas',      ico:'🗒️', tipo:'nota',      abaCor:'#9B6FD1', concluidos:false },
+    { id:'lembretes',  nome:'Lembretes',  ico:'📌', tipo:'lembrete',  abaCor:'#E08A2B', concluidos:true },
+    { id:'acessos',    nome:'Acessos',    ico:'🔑', tipo:'login',     abaCor:'#2BB0A8', concluidos:false }
+  ];
+
+  /* ============ estado inicial ============ */
+  const criarCartao = (tipo, cor, over={}) => Object.assign({
+    id: uid(),
+    tipo,
+    cliente: '',
+    texto: '',
+    cor,
+    fonte: tipo === 'orcamento' ? 14 : 15,
+    negrito: false,
+    data: null,
+    link: '',
+    // pedido:
+    etapaAtual: 0,           // 0 projeto, 1 produção, 2 instalação
+    datasEtapa: [null,null,null],
+    entrega: null,
+    // nota livre:
+    x: 30, y: 30,
+    larg: 220, alt: 150,
+    imagens: [],
+    // concluído:
+    categoria: 'orcados'
+  }, over);
+
+  function inicial() {
+    return {
+      paginas: {
+        orcamentos: {
+          colunas: [
+            { id:uid(), titulo:'ORÇAMENTO', acento:'amarelo', notas:[
+              criarCartao('orcamento','amarelo',{ cliente:'LOCALIZA', texto:'20/04 – contato (em equalização)', categoria:'orcados' })
+            ]},
+            { id:uid(), titulo:'EM ANÁLISE', acento:'azul', notas:[
+              criarCartao('orcamento','branco',{ cliente:'', texto:'', categoria:'monitorados' })
+            ]},
+            { id:uid(), titulo:'AGUARDANDO', acento:'roxo', notas:[
+              criarCartao('orcamento','branco',{ cliente:'', texto:'', categoria:'monitorados' })
+            ]}
+          ],
+          concluidos: []
+        },
+        pedidos: {
+          colunas: [
+            { id:uid(), titulo:'PROJETO', acento:'roxo', notas:[
+              criarCartao('pedido','branco',{ cliente:'NOME DO CLIENTE', etapaAtual:0,
+                datasEtapa:['2026-03-09','2026-03-21','2026-05-24'], entrega:'2026-06-23' })
+            ]},
+            { id:uid(), titulo:'PRODUÇÃO', acento:'laranja', notas:[
+              criarCartao('pedido','branco',{ cliente:'NOME DO CLIENTE', etapaAtual:1,
+                datasEtapa:['2026-03-09','2026-03-21','2026-05-24'], entrega:'2026-06-23' })
+            ]},
+            { id:uid(), titulo:'INSTALAÇÃO', acento:'verde', notas:[
+              criarCartao('pedido','branco',{ cliente:'NOME DO CLIENTE', etapaAtual:2,
+                datasEtapa:['2026-03-09','2026-03-21','2026-05-24'], entrega:'2026-06-23' })
+            ]}
+          ],
+          concluidos: []
+        },
+        notas: {
+          livres: [
+            criarCartao('nota','amarelo',{ cliente:'PANDORA', texto:'◙ STUDIO EDU - ALESSANDRA\nAguardo contra-proposta', x:30, y:30 }),
+            criarCartao('nota','azul',   { cliente:'LOCALIZA', texto:'13/02 - reativado contato com ALEX MACHADO, devem reiniciar processo em MARÇO/26', x:280, y:30 }),
+            criarCartao('nota','verde',  { cliente:'FORTAÇO', texto:'13/02 - enviado email individual a todos os contatos para reativação do processo de homologação', x:530, y:30 })
+          ]
+        },
+        lembretes: {
+          colunas: [
+            { id:uid(), titulo:'IMPORTANTE', acento:'amarelo', notas:[
+              criarCartao('lembrete','magenta',{ texto:'ENVIAR DOCUMENTOS\nCobrar envio do Sylvio para documento faltante.', fonte:16 }),
+              criarCartao('lembrete','verde',{ texto:'' })
+            ]},
+            { id:uid(), titulo:'PRIORIDADE', acento:'verde', notas:[
+              criarCartao('lembrete','vermelho',{ texto:'' }),
+              criarCartao('lembrete','verde',{ texto:'' })
+            ]},
+            { id:uid(), titulo:'URGENTE', acento:'vermelho', notas:[
+              criarCartao('lembrete','azul',{ texto:'' }),
+              criarCartao('lembrete','marinho',{ texto:'' })
+            ]}
+          ],
+          concluidos: []
+        },
+        acessos: {
+          colunas: [
+            { id:uid(), titulo:'PLATAFORMAS', acento:'ciano', notas:[
+              criarCartao('login','branco',{ cliente:'WEHANDLE – B3', texto:'Ricardo.Fontes\n@Tcf47881410', link:'' })
+            ]},
+            { id:uid(), titulo:'INVESTIMENTOS', acento:'azul', notas:[
+              criarCartao('login','branco',{ cliente:'VIVARA │ B3', texto:'ricardo.fontes@tcf.net.br\n@Tcf165b3investimento', link:'' })
+            ]},
+            { id:uid(), titulo:'PORTAIS', acento:'roxo', notas:[
+              criarCartao('login','branco',{ cliente:'GRUPO IMC – COUPA', texto:'Ricardo.fontes@tcf.net.br\n@TCF165ricfon', link:'' })
+            ]}
+          ],
+          concluidos: []
+        }
+      },
+      paginaAtiva: 'orcamentos'
+    };
+  }
+
+  let estado = inicial();
+  let selecionada = null;   // id do cartão selecionado
+  let editando = null;      // id do cartão em edição de texto
+
+  /* ============ armazenamento (localStorage + window.storage) ============ */
+  const cofre = (() => {
+    const temNuvem = !!(window.storage && typeof window.storage.get === 'function');
+    let temLocal = false;
+    try {
+      const t = '__teste-painel__';
+      localStorage.setItem(t, '1'); localStorage.removeItem(t); temLocal = true;
+    } catch (e) { temLocal = false; }
+    return {
+      temNuvem,
+      get temLocal(){ return temLocal; },
+      lerLocal(chave){ if(!temLocal) return null; try{ return localStorage.getItem(chave); }catch(e){ return null; } },
+      gravarLocal(chave, texto){ if(!temLocal) return false; try{ localStorage.setItem(chave, texto); return true; }catch(e){ temLocal=false; return false; } },
+      async lerNuvem(chave){ if(!temNuvem) return null; try{ const r = await window.storage.get(chave); return (r && r.value) || null; }catch(e){ return null; } },
+      async gravarNuvem(chave, texto){ if(!temNuvem) return false; try{ await window.storage.set(chave, texto); return true; }catch(e){ return false; } }
+    };
+  })();
+
+  const elEstado = $('#estadoSalvo');
+  function mostrarEstado(tipo, quando) {
+    if (!elEstado) return;
+    elEstado.dataset.estado = tipo;
+    if (tipo === 'salvando') { elEstado.textContent = 'Salvando…'; elEstado.title = 'Gravando as alterações.'; }
+    else if (tipo === 'erro') { elEstado.textContent = 'Não foi possível salvar';
+      elEstado.title = 'Este navegador está bloqueando o armazenamento local. Saia da janela anônima ou libere os dados de site para voltar a salvar.'; }
+    else {
+      const h = new Date(quando || Date.now()).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+      elEstado.textContent = 'Salvo ' + h;
+      elEstado.title = 'O painel salva sozinho a cada alteração. Última gravação às ' + h + '.';
+    }
+  }
+
+  let carregado = false, pendenteNuvem = false, timerNuvem = null;
+
+  function guardar() {
+    if (!carregado) return;
+    estado.salvoEm = Date.now();
+    const texto = JSON.stringify(estado);
+    const okLocal = cofre.gravarLocal(CHAVE, texto);
+    pendenteNuvem = true;
+    if (!okLocal && !cofre.temNuvem) { mostrarEstado('erro'); return; }
+    mostrarEstado('salvando');
+    clearTimeout(timerNuvem);
+    timerNuvem = setTimeout(enviarPendente, 500);
+  }
+  async function enviarPendente() {
+    clearTimeout(timerNuvem);
+    if (!carregado || !pendenteNuvem) return;
+    pendenteNuvem = false;
+    const texto = JSON.stringify(estado);
+    const okNuvem = await cofre.gravarNuvem(CHAVE, texto);
+    mostrarEstado(okNuvem || cofre.temLocal ? 'ok' : 'erro', estado.salvoEm);
+  }
+  function salvarNaSaida() {
+    if (!carregado) return;
+    estado.salvoEm = Date.now();
+    cofre.gravarLocal(CHAVE, JSON.stringify(estado));
+    enviarPendente();
+  }
+  addEventListener('pagehide', salvarNaSaida);
+  addEventListener('beforeunload', salvarNaSaida);
+  addEventListener('blur', () => { if (pendenteNuvem) enviarPendente(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') salvarNaSaida(); });
+  setInterval(() => { if (pendenteNuvem) enviarPendente(); }, 10000);
+
+  function maisRecente(textos) {
+    let melhor = null;
+    textos.forEach(txt => {
+      if (!txt) return;
+      try { const d = JSON.parse(txt);
+        if (d && d.paginas) { if (!melhor || (d.salvoEm||0) > (melhor.salvoEm||0)) melhor = d; }
+      } catch(e){}
+    });
+    return melhor;
+  }
+  /* garante que estados antigos ganhem campos novos sem quebrar */
+  function migrar(d) {
+    const base = inicial();
+    d.paginas = d.paginas || base.paginas;
+    for (const p of PAGINAS) {
+      const pg = d.paginas[p.id] || (d.paginas[p.id] = base.paginas[p.id]);
+      if (p.tipo === 'nota') { pg.livres = pg.livres || []; }
+      else { pg.colunas = pg.colunas || []; if (p.concluidos) pg.concluidos = pg.concluidos || []; }
+    }
+    d.paginaAtiva = d.paginaAtiva || 'orcamentos';
+    return d;
+  }
+
+  /* ============ localizar cartão ============ */
+  function acharNoQuadro(pgId, id) {
+    const pg = estado.paginas[pgId];
+    if (!pg) return null;
+    if (pg.colunas) {
+      for (const c of pg.colunas) {
+        const n = c.notas.find(n => n.id === id);
+        if (n) return { nota:n, coluna:c, pg };
+      }
+    }
+    if (pg.livres) {
+      const n = pg.livres.find(n => n.id === id);
+      if (n) return { nota:n, pg };
+    }
+    return null;
+  }
+  function acharAtiva(id) { return acharNoQuadro(estado.paginaAtiva, id); }
+
+  /* ============ atalhos DOM ============ */
+  const elAbas  = $('#abas');
+  const elArea  = $('#areaPaginas');
+
+  /* refs por página, preenchidas ao montar */
+  const dom = {}; // dom[pgId] = { pagina, alvo (colunas/lona), ferramentas, ... }
+
+  /* ============ montar a casca das páginas (uma vez) ============ */
+  function montarPaginas() {
+    elAbas.innerHTML = '';
+    elArea.innerHTML = '';
+
+    PAGINAS.forEach(p => {
+      /* ---- aba ---- */
+      const aba = document.createElement('button');
+      aba.type = 'button';
+      aba.className = 'aba';
+      aba.setAttribute('role','tab');
+      aba.dataset.pg = p.id;
+      aba.style.setProperty('--aba-cor', p.abaCor);
+      aba.innerHTML = `<span class="ico" aria-hidden="true">${p.ico}</span>${p.nome} <span class="conta" data-conta="${p.id}">0</span>`;
+      aba.addEventListener('click', () => trocarPagina(p.id));
+      elAbas.appendChild(aba);
+
+      /* ---- página ---- */
+      const pagina = document.createElement('section');
+      pagina.className = 'pagina';
+      pagina.dataset.pg = p.id;
+      pagina.setAttribute('role','tabpanel');
+
+      /* barra de ferramentas comum a todas as páginas com cartões editáveis */
+      const barra = document.createElement('div');
+      barra.className = 'barra-ferr';
+      barra.innerHTML = `
+        <div class="ferramentas inativo" data-ferr>
+          <div class="cores" data-cores></div>
+          <div class="divisor"></div>
+          <button type="button" class="ferr pequeno" data-menor title="Diminuir fonte" aria-label="Diminuir fonte">A</button>
+          <span class="tam" data-tam>15</span>
+          <button type="button" class="ferr grande" data-maior title="Aumentar fonte" aria-label="Aumentar fonte">A</button>
+          <button type="button" class="ferr" data-negrito aria-pressed="false" title="Negrito">N</button>
+          ${p.tipo!=='nota' ? '<div class="divisor"></div><button type="button" class="ferr apagar" data-concluir title="Concluir e arquivar" aria-label="Concluir e arquivar">✕</button>' : ''}
+          ${p.tipo==='nota' ? '<div class="divisor"></div><button type="button" class="ferr apagar" data-excluir title="Excluir cartão" aria-label="Excluir cartão">🗑</button>' : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          ${p.concluidos ? `<button type="button" class="btn-concluidos" data-abrir-concluidos>
+            <span aria-hidden="true">🗂</span> Concluídos <span class="contagem" data-badge></span></button>` : ''}
+        </div>`;
+      pagina.appendChild(barra);
+
+      /* dica */
+      const dica = document.createElement('p');
+      dica.className = 'dica';
+      dica.innerHTML = dicaDaPagina(p);
+      pagina.appendChild(dica);
+
+      /* quadro principal */
+      const quadro = document.createElement('div');
+      quadro.className = 'quadro';
+      quadro.dataset.quadro = p.id;
+
+      if (p.tipo === 'nota') {
+        const mural = document.createElement('div');
+        mural.className = 'mural';
+        mural.dataset.mural = p.id;
+        const lona = document.createElement('div');
+        lona.className = 'lona';
+        lona.dataset.lona = p.id;
+        mural.appendChild(lona);
+        quadro.appendChild(mural);
+        pagina.appendChild(quadro);
+        dom[p.id] = { pagina, barra, quadro, lona, tipo:p.tipo, def:p };
+      } else {
+        const cols = document.createElement('div');
+        cols.className = 'colunas ' + (p.tipo==='pedido' ? 'cols-3' : 'cols-3');
+        cols.dataset.cols = p.id;
+        quadro.appendChild(cols);
+        pagina.appendChild(quadro);
+
+        /* tela de concluídos */
+        let telaConc = null;
+        if (p.concluidos) {
+          telaConc = document.createElement('section');
+          telaConc.className = 'tela-concluidos';
+          telaConc.hidden = true;
+          telaConc.dataset.conc = p.id;
+          telaConc.innerHTML = `
+            <div class="cabecalho-concluidos">
+              <button type="button" class="btn-voltar" data-voltar>← Voltar ao quadro</button>
+              <h2>Concluídos — ${p.nome}</h2>
+            </div>
+            <div class="gc" data-gc></div>`;
+          pagina.appendChild(telaConc);
+        }
+        dom[p.id] = { pagina, barra, quadro, cols, telaConc, tipo:p.tipo, def:p };
+      }
+
+      elArea.appendChild(pagina);
+      ligarBarra(p);
+    });
+  }
+
+  function dicaDaPagina(p) {
+    switch(p.tipo){
+      case 'orcamento': return 'Clique no cartão para escrever · destaque o <strong>cliente</strong> no topo · defina a <strong>data</strong> (fica vermelho quando vencer) · cole um caminho de pasta interna e use o botão <strong>IR</strong> · arraste pelo <strong>⠿</strong> entre colunas · ✕ arquiva em Concluídos.';
+      case 'pedido':    return 'Clique nas <strong>bolinhas</strong> para marcar Projeto → Produção → Instalação · descreva o <strong>tipo de serviço</strong> · defina a <strong>data de entrega</strong> (o cartão fica vermelho quando vencer) · cole o caminho da pasta e use <strong>IR</strong> · arraste pelo <strong>⠿</strong> para mudar de status · ✕ arquiva em Concluídos.';
+      case 'nota':      return 'Notas livres — arraste pelo <strong>⠿</strong> para posicionar em qualquer lugar do mural · clique para escrever · cole (Ctrl+V) uma imagem dentro da nota · arraste o canto inferior direito para redimensionar · 🗑 exclui.';
+      case 'lembrete':  return 'Clique no cartão para escrever · arraste pelo <strong>⠿</strong> para mudar de coluna · defina a data para o alerta automático · ✕ arquiva em Concluídos.';
+      case 'login':     return 'Guarde acessos: <strong>cliente/plataforma</strong> no topo, login e senha no corpo · cole o caminho da pasta ou a URL e clique <strong>IR</strong>.';
+    }
+    return '';
+  }
+
+  /* ============ trocar página ============ */
+  function trocarPagina(pgId) {
+    estado.paginaAtiva = pgId;
+    limparSelecao();
+    $$('.aba', elAbas).forEach(a => a.setAttribute('aria-selected', String(a.dataset.pg === pgId)));
+    Object.entries(dom).forEach(([id, d]) => d.pagina.classList.toggle('ativa', id === pgId));
+    // ao trocar, sempre volta ao quadro (esconde concluídos)
+    const d = dom[pgId];
+    if (d.quadro) d.quadro.hidden = false;
+    if (d.telaConc) d.telaConc.hidden = true;
+    desenharPagina(pgId);
+    guardar();
+  }
+
+  /* ============ desenhar página ============ */
+  function desenharPagina(pgId) {
+    const d = dom[pgId];
+    if (!d) return;
+    if (d.tipo === 'nota') desenharMural(pgId);
+    else desenharColunas(pgId);
+    atualizarContagens();
+  }
+
+  function desenharColunas(pgId) {
+    const d = dom[pgId];
+    const pg = estado.paginas[pgId];
+    const alvo = d.cols;
+    alvo.innerHTML = '';
+
+    pg.colunas.forEach(col => {
+      const sec = document.createElement('section');
+      sec.className = 'coluna';
+      sec.dataset.col = col.id;
+      sec.style.setProperty('--acento', ACENTOS[col.acento] || ACENTOS.amarelo);
+
+      const cab = document.createElement('div');
+      cab.className = 'cabecalho-coluna';
+      const tit = document.createElement('span');
+      tit.className = 'titulo-coluna';
+      tit.contentEditable = 'true';
+      tit.spellcheck = false;
+      tit.textContent = col.titulo;
+      tit.addEventListener('input', () => { col.titulo = tit.textContent.trim() || '—'; guardar(); });
+      tit.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); tit.blur(); } });
+      cab.appendChild(tit);
+
+      const icone = document.createElement('button');
+      icone.type = 'button'; icone.className = 'icone-coluna';
+      icone.title = 'Renomear coluna'; icone.setAttribute('aria-label','Renomear coluna');
+      icone.innerHTML = '<span></span><span></span>';
+      icone.addEventListener('click', () => {
+        tit.focus();
+        const r = document.createRange(); r.selectNodeContents(tit);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      });
+      cab.appendChild(icone);
+      sec.appendChild(cab);
+
+      const grade = document.createElement('div');
+      grade.className = 'grade' + (d.tipo==='pedido' ? ' grade-1' : '');
+      grade.dataset.grade = col.id;
+
+      col.notas.forEach(n => grade.appendChild(desenharCartao(n, pgId)));
+      if (!col.notas.length) {
+        const v = document.createElement('p'); v.className = 'vazia'; v.textContent = 'Coluna vazia.';
+        grade.appendChild(v);
+      }
+      const btnAdd = document.createElement('button');
+      btnAdd.type = 'button'; btnAdd.className = 'adicionar';
+      btnAdd.innerHTML = '<span aria-hidden="true">+</span> Novo';
+      btnAdd.addEventListener('click', () => adicionarNaColuna(pgId, col));
+      grade.appendChild(btnAdd);
+
+      sec.appendChild(grade);
+      alvo.appendChild(sec);
+    });
+  }
+
+  function desenharMural(pgId) {
+    const d = dom[pgId];
+    const pg = estado.paginas[pgId];
+    d.lona.innerHTML = '';
+    pg.livres.forEach(n => d.lona.appendChild(desenharNotaLivre(n, pgId)));
+  }
+
+  /* ---------- cor efetiva (vermelho se vencido) ---------- */
+  function corEfetiva(n) {
+    const venc = ehVencido(n);
+    return venc ? VENCIDO : (PAPEIS[n.cor] || PAPEIS.amarelo);
+  }
+  function ehVencido(n) {
+    if (n.tipo === 'pedido') return estaVencido(n.entrega);
+    if (n.tipo === 'login')  return false;
+    return estaVencido(n.data);
+  }
+  function aplicarEstilo(el, n) {
+    const venc = ehVencido(n);
+    const p = corEfetiva(n);
+    el.style.setProperty('--cor-fundo', p.bg);
+    el.style.setProperty('--cor-texto', p.ink);
+    el.style.setProperty('--fs', (n.fonte||15) + 'px');
+    el.classList.toggle('vencido', venc);
+    el.classList.toggle('escuro', p.ink.toUpperCase() === '#FFFFFF');
+  }
+
+  /* ---------- alça de arraste ---------- */
+  function fazerAlca() {
+    const a = document.createElement('span');
+    a.className = 'alca'; a.title = 'Arraste para mover'; a.setAttribute('aria-hidden','true');
+    a.textContent = '⠿';
+    return a;
+  }
+
+  /* ---------- campo cliente (destaque) ---------- */
+  function fazerCampoCliente(n, elCartao) {
+    const c = document.createElement('div');
+    c.className = 'campo-cliente';
+    c.contentEditable = 'false';
+    c.spellcheck = false;
+    c.textContent = n.cliente || '';
+    c.dataset.campo = 'cliente';
+    c.title = 'Clique para editar o cliente';
+    c.addEventListener('input', () => { n.cliente = c.innerText.replace(/\u00a0/g,' '); guardar(); });
+    c.addEventListener('paste', e => {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, t);
+    });
+    c.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); c.blur(); } if(e.key==='Escape'){ e.preventDefault(); c.blur(); } });
+    c.addEventListener('pointerdown', e => e.stopPropagation());
+    /* clicar direto no campo cliente já ativa a edição dele, sem abrir o corpo */
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      if (Date.now() - fimDoArraste < 300) return;
+      selecionar(n.id);
+      c.contentEditable = 'true';
+      c.focus();
+      /* marca o cartão como "em edição" para que Backspace/Delete apague
+         caracteres do campo, em vez de excluir/concluir o cartão inteiro */
+      editando = n.id;
+      if (elCartao) elCartao.classList.add('editando');
+      const sel = window.getSelection(), r = document.createRange();
+      r.selectNodeContents(c); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r);
+    });
+    c.addEventListener('blur', () => {
+      c.contentEditable = 'false';
+      if (editando === n.id) {
+        editando = null;
+        if (elCartao) elCartao.classList.remove('editando');
+      }
+      if (pendenteNuvem) enviarPendente();
+    });
+    return c;
+  }
+
+  /* ---------- corpo de texto ---------- */
+  function fazerTexto(n, el, placeholder, permitirImagem) {
+    const txt = document.createElement('div');
+    txt.className = 'texto' + (n.negrito ? ' negrito' : '');
+    txt.textContent = n.texto;
+    txt.spellcheck = false;
+    if (placeholder) txt.dataset.ph = placeholder;
+    txt.addEventListener('input', () => {
+      const bruto = txt.innerText != null ? txt.innerText : (txt.textContent||'');
+      n.texto = bruto.replace(/\u00a0/g,' '); guardar();
+    });
+    txt.addEventListener('paste', e => {
+      const dt = e.clipboardData || window.clipboardData;
+      if (permitirImagem && dt && dt.items) {
+        const itensImagem = Array.from(dt.items).filter(it => it.kind === 'file' && it.type && it.type.startsWith('image/'));
+        if (itensImagem.length) {
+          e.preventDefault();
+          itensImagem.forEach(it => {
+            const arquivo = it.getAsFile();
+            if (!arquivo) return;
+            const leitor = new FileReader();
+            leitor.onload = () => {
+              n.imagens = n.imagens || [];
+              n.imagens.push(leitor.result);
+              renderImagensNota(el, n);
+              guardar();
+            };
+            leitor.readAsDataURL(arquivo);
+          });
+          return;
+        }
+      }
+      e.preventDefault();
+      const t = dt.getData('text/plain');
+      document.execCommand('insertText', false, t);
+    });
+    txt.addEventListener('keydown', e => { if (e.key==='Escape'){ e.preventDefault(); txt.blur(); } });
+    txt.addEventListener('blur', () => {
+      if (editando === n.id){ editando = null; el.classList.remove('editando'); txt.contentEditable='false';
+        const cli = el.querySelector('.campo-cliente'); if(cli) cli.contentEditable='false'; }
+      if (pendenteNuvem) enviarPendente();
+    });
+    return txt;
+  }
+
+  /* ---------- imagens coladas dentro de uma nota livre ---------- */
+  function renderImagensNota(elCartao, n) {
+    let cont = elCartao.querySelector('.imagens-nota');
+    if (!cont) {
+      cont = document.createElement('div');
+      cont.className = 'imagens-nota';
+      const dono = elCartao.querySelector('.conteudo-livre') || elCartao;
+      dono.appendChild(cont);
+    }
+    cont.innerHTML = '';
+    (n.imagens || []).forEach((src, i) => {
+      const item = document.createElement('div');
+      item.className = 'item-imagem';
+      const img = document.createElement('img');
+      img.src = src; img.alt = 'Imagem colada na nota'; img.draggable = false;
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn-remover-imagem';
+      btn.title = 'Remover imagem'; btn.setAttribute('aria-label','Remover imagem');
+      btn.textContent = '×';
+      btn.addEventListener('pointerdown', e => e.stopPropagation());
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        n.imagens.splice(i, 1);
+        renderImagensNota(elCartao, n);
+        guardar();
+      });
+      item.append(img, btn);
+      cont.appendChild(item);
+    });
+  }
+
+  /* ---------- redimensionar nota livre pelo canto ---------- */
+  function ligarRedimensionamento(el, n) {
+    const alca = document.createElement('div');
+    alca.className = 'alca-redimensionar';
+    alca.title = 'Arraste para redimensionar';
+    alca.setAttribute('aria-hidden','true');
+    alca.addEventListener('click', e => e.stopPropagation());
+    alca.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      const largInicial = el.offsetWidth, altInicial = el.offsetHeight;
+      const x0 = e.clientX, y0 = e.clientY;
+      el.classList.add('redimensionando');
+      try { alca.setPointerCapture(e.pointerId); } catch(_) {}
+      function mover(ev) {
+        const novaLarg = Math.max(180, largInicial + (ev.clientX - x0));
+        const novaAlt  = Math.max(110, altInicial  + (ev.clientY - y0));
+        el.style.width  = novaLarg + 'px';
+        el.style.height = novaAlt  + 'px';
+      }
+      function soltar() {
+        el.classList.remove('redimensionando');
+        removeEventListener('pointermove', mover);
+        removeEventListener('pointerup', soltar);
+        removeEventListener('pointercancel', soltar);
+        n.larg = el.offsetWidth; n.alt = el.offsetHeight;
+        guardar();
+      }
+      addEventListener('pointermove', mover);
+      addEventListener('pointerup', soltar);
+      addEventListener('pointercancel', soltar);
+    });
+    el.appendChild(alca);
+  }
+
+  /* ---------- linha de data ---------- */
+  function fazerLinhaData(n, el, rotulo) {
+    const linha = document.createElement('label');
+    linha.className = 'linha-data'; linha.title = 'Data do lembrete';
+    const ico = document.createElement('span'); ico.setAttribute('aria-hidden','true'); ico.textContent = '📅';
+    let rot = null;
+    if (rotulo){ rot = document.createElement('span'); rot.className='rotulo-data'; rot.textContent = rotulo; }
+    const campo = document.createElement('input');
+    campo.type = 'date'; campo.className = 'campo-data'; campo.setAttribute('aria-label','Data');
+    campo.value = n.data || '';
+    const selo = document.createElement('span'); selo.className='selo-atrasado'; selo.textContent='Atrasado';
+    if (rot) linha.append(ico, rot, campo, selo); else linha.append(ico, campo, selo);
+    linha.addEventListener('pointerdown', e => e.stopPropagation());
+    linha.addEventListener('click', e => e.stopPropagation());
+    campo.addEventListener('change', () => { n.data = campo.value || null; aplicarEstilo(el, n); guardar(); });
+    return linha;
+  }
+
+  /* ---------- linha de link + botão IR ---------- */
+  function fazerLinhaLink(n) {
+    const linha = document.createElement('div');
+    linha.className = 'linha-link';
+    const campo = document.createElement('input');
+    campo.type = 'text'; campo.className = 'campo-link';
+    campo.placeholder = 'Cole o caminho (ex.: C:\\Pasta ou \\\\servidor\\pasta)…';
+    campo.value = n.link || '';
+    campo.setAttribute('aria-label','Caminho ou link do cartão');
+    const ir = document.createElement('a');
+    ir.className = 'btn-ir' + (n.link ? '' : ' inativo');
+    ir.textContent = 'IR';
+    ir.target = '_blank'; ir.rel = 'noopener noreferrer';
+
+    function aplicar() {
+      const info = analisarLink(n.link);
+      ir.href = info.href || '#';
+      ir.classList.toggle('inativo', !n.link);
+      ir.title = info.interno
+        ? 'Abrir no Explorador de Arquivos: ' + info.exibicao
+        : (n.link ? 'Abrir link: ' + info.exibicao : 'Cole um caminho ou link');
+    }
+    aplicar();
+
+    campo.addEventListener('input', () => { n.link = campo.value.trim(); aplicar(); guardar(); });
+    linha.addEventListener('pointerdown', e => e.stopPropagation());
+    linha.addEventListener('click', e => e.stopPropagation());
+
+    ir.addEventListener('click', e => {
+      if (!n.link) { e.preventDefault(); return; }
+      const info = analisarLink(n.link);
+      if (info.interno) {
+        // caminhos locais/de rede: tenta abrir o Explorer; muitos navegadores
+        // bloqueiam a navegação file:// por segurança — então também copiamos
+        // o caminho para a área de transferência como alternativa garantida.
+        let abriu = false;
+        try { abriu = !!window.open(info.href, '_blank'); } catch (_) { abriu = false; }
+        copiarTexto(info.exibicao);
+        if (!abriu) {
+          e.preventDefault();
+          avisarCaminho(info.exibicao);
+        }
+      }
+      // links web seguem o comportamento padrão do href (abre em nova aba)
+    });
+
+    linha.append(campo, ir);
+    return linha;
+  }
+
+  /* copia texto para a área de transferência (best-effort) */
+  function copiarTexto(t) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t); return; }
+    } catch (_) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (_) {}
+  }
+
+  /* aviso curto quando o navegador bloqueia a abertura do caminho local */
+  let elAviso = null, timerAviso = null;
+  function avisarCaminho(caminho) {
+    if (!elAviso) {
+      elAviso = document.createElement('div');
+      elAviso.className = 'aviso-caminho';
+      document.body.appendChild(elAviso);
+    }
+    elAviso.innerHTML = '<strong>Caminho copiado.</strong> O navegador bloqueia abrir pastas locais direto. ' +
+      'Cole no Explorador de Arquivos (Win+E) e tecle Enter:<br><span class="cam">' +
+      caminho.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>';
+    elAviso.classList.add('ativo');
+    clearTimeout(timerAviso);
+    timerAviso = setTimeout(() => elAviso.classList.remove('ativo'), 6000);
+  }
+
+  /* ---------- barra de etapas do pedido ---------- */
+  const NOMES_ETAPA = ['Projeto','Produção','Instalação'];
+  function fazerEtapas(n, el) {
+    const wrap = document.createElement('div');
+    wrap.className = 'etapas';
+    NOMES_ETAPA.forEach((nome, i) => {
+      const et = document.createElement('div');
+      et.className = 'etapa' + (i < n.etapaAtual ? ' feita' : (i === n.etapaAtual ? ' atual feita' : ''));
+      const conector = document.createElement('span'); conector.className = 'linha-conector';
+      const bol = document.createElement('button');
+      bol.type = 'button'; bol.className = 'bolinha';
+      bol.title = 'Marcar como ' + nome; bol.setAttribute('aria-label','Marcar etapa '+nome);
+      bol.addEventListener('pointerdown', e => e.stopPropagation());
+      bol.addEventListener('click', e => {
+        e.stopPropagation();
+        n.etapaAtual = i;
+        guardar();
+        desenharColunas(estado.paginaAtiva);
+      });
+      const rot = document.createElement('span'); rot.className = 'rotulo'; rot.textContent = nome;
+      const quando = document.createElement('input');
+      quando.type = 'date'; quando.className = 'quando'; quando.value = n.datasEtapa[i] || '';
+      quando.setAttribute('aria-label', 'Data de ' + nome);
+      quando.addEventListener('pointerdown', e => e.stopPropagation());
+      quando.addEventListener('click', e => e.stopPropagation());
+      quando.addEventListener('change', () => { n.datasEtapa[i] = quando.value || null; guardar(); });
+      et.append(conector, bol, rot, quando);
+      wrap.appendChild(et);
+    });
+    return wrap;
+  }
+
+  /* ---------- linha de entrega ---------- */
+  function fazerLinhaEntrega(n, el) {
+    const linha = document.createElement('label');
+    linha.className = 'linha-entrega'; linha.title = 'Data de entrega';
+    const rot = document.createElement('span'); rot.className='rot'; rot.textContent = 'Entrega:';
+    const campo = document.createElement('input');
+    campo.type = 'date'; campo.className = 'campo-entrega'; campo.value = n.entrega || '';
+    campo.setAttribute('aria-label','Data de entrega');
+    const selo = document.createElement('span'); selo.className='selo-atrasado'; selo.textContent='Atrasado';
+    linha.append(rot, campo, selo);
+    linha.addEventListener('pointerdown', e => e.stopPropagation());
+    linha.addEventListener('click', e => e.stopPropagation());
+    campo.addEventListener('change', () => { n.entrega = campo.value || null; aplicarEstilo(el, n); guardar(); });
+    return linha;
+  }
+
+  /* ============ desenhar cartão (colunas) ============ */
+  function desenharCartao(n, pgId) {
+    const el = document.createElement('article');
+    el.className = 'cartao' + (n.id === selecionada ? ' selecionado' : '');
+    el.dataset.id = n.id;
+    el.tabIndex = 0;
+    aplicarEstilo(el, n);
+    el.appendChild(fazerAlca());
+
+    if (n.tipo === 'orcamento') {
+      el.appendChild(fazerCampoCliente(n, el));
+      el.appendChild(fazerTexto(n, el));
+      el.appendChild(fazerLinhaData(n, el));
+      el.appendChild(fazerLinhaLink(n));
+    } else if (n.tipo === 'pedido') {
+      el.appendChild(fazerCampoCliente(n, el));
+      el.appendChild(fazerTexto(n, el, 'Tipo de serviço…'));
+      el.appendChild(fazerEtapas(n, el));
+      el.appendChild(fazerLinhaEntrega(n, el));
+      el.appendChild(fazerLinhaLink(n));
+    } else if (n.tipo === 'login') {
+      el.appendChild(fazerCampoCliente(n, el));
+      el.appendChild(fazerTexto(n, el));
+      el.appendChild(fazerLinhaLink(n));
+    } else { /* lembrete */
+      el.appendChild(fazerCampoCliente(n, el));
+      el.appendChild(fazerTexto(n, el));
+      el.appendChild(fazerLinhaData(n, el));
+    }
+
+    ligarInteracaoCartao(el, n, pgId);
+    return el;
+  }
+
+  /* ============ desenhar nota livre (mural) ============ */
+  function desenharNotaLivre(n, pgId) {
+    const el = document.createElement('article');
+    el.className = 'nota-livre cartao' + (n.id === selecionada ? ' selecionado' : '');
+    el.dataset.id = n.id;
+    el.tabIndex = 0;
+    el.style.left = (n.x||30) + 'px';
+    el.style.top  = (n.y||30) + 'px';
+    el.style.width  = (n.larg||220) + 'px';
+    el.style.height = (n.alt||150) + 'px';
+    aplicarEstilo(el, n);
+    el.appendChild(fazerAlca());
+    el.appendChild(fazerCampoCliente(n, el));
+    const conteudo = document.createElement('div');
+    conteudo.className = 'conteudo-livre';
+    conteudo.appendChild(fazerTexto(n, el, null, true));
+    el.appendChild(conteudo);
+    renderImagensNota(el, n);
+    ligarInteracaoCartao(el, n, pgId);
+    ligarRedimensionamento(el, n);
+    return el;
+  }
+
+  /* ============ interação (clique/edição/teclado/arraste) ============ */
+  function ligarInteracaoCartao(el, n, pgId) {
+    el.addEventListener('keydown', e => {
+      if ((e.key==='Enter' || e.key===' ') && editando !== n.id && e.target === el) {
+        e.preventDefault(); abrir(n, el);
+      }
+    });
+    el.addEventListener('pointerdown', e => prepararArraste(e, n, el, pgId));
+    el.addEventListener('click', e => {
+      if (e.target.closest('.linha-data') || e.target.closest('.linha-link') ||
+          e.target.closest('.linha-entrega') || e.target.closest('.etapas') ||
+          e.target.closest('.campo-cliente')) {
+        // esses campos têm comportamento próprio; ainda assim seleciona o cartão
+        if (e.target.closest('.campo-cliente')) { /* deixa focar */ }
+        selecionar(n.id);
+        return;
+      }
+      if (Date.now() - fimDoArraste < 300) return;
+      if (editando === n.id) return;
+      abrir(n, el);
+    });
+  }
+
+  function abrir(n, el) {
+    selecionar(n.id);
+    editando = n.id;
+    el.classList.add('editando');
+    const cli = el.querySelector('.campo-cliente');
+    if (cli) cli.contentEditable = 'true';
+    const txt = el.querySelector('.texto');
+    if (txt) {
+      txt.contentEditable = 'true';
+      txt.focus();
+      const sel = window.getSelection(), r = document.createRange();
+      r.selectNodeContents(txt); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r);
+    } else if (cli) {
+      cli.focus();
+    }
+  }
+
+  function selecionar(id) {
+    selecionada = id;
+    const d = dom[estado.paginaAtiva];
+    const raiz = d.tipo === 'nota' ? d.lona : d.cols;
+    $$('.cartao', raiz).forEach(el => el.classList.toggle('selecionado', el.dataset.id === id));
+    atualizarFerramentas();
+  }
+  function limparSelecao() {
+    selecionada = null; editando = null;
+    Object.values(dom).forEach(d => {
+      const raiz = d.tipo === 'nota' ? d.lona : d.cols;
+      if (!raiz) return;
+      $$('.cartao', raiz).forEach(el => {
+        el.classList.remove('selecionado','editando');
+        const t = el.querySelector('.texto'); if (t) t.contentEditable = 'false';
+        const c = el.querySelector('.campo-cliente'); if (c) c.contentEditable = 'false';
+      });
+    });
+    atualizarFerramentas();
+  }
+
+  /* ============ ações ============ */
+  function adicionarNaColuna(pgId, col) {
+    const def = PAGINAS.find(p => p.id === pgId);
+    const n = criarCartao(def.tipo, def.tipo==='pedido' || def.tipo==='login' ? 'branco' : (col.acento && PAPEIS[col.acento] ? col.acento : 'amarelo'));
+    if (def.tipo === 'orcamento') n.categoria = categoriaPadrao(col.titulo);
+    col.notas.push(n);
+    guardar(); desenharColunas(pgId); atualizarContagens();
+    const el = dom[pgId].cols.querySelector(`.cartao[data-id="${n.id}"]`);
+    if (el) { el.scrollIntoView({ block:'nearest', behavior:'smooth' }); abrir(n, el); }
+  }
+  function adicionarNota(pgId) {
+    const mural = dom[pgId].quadro.querySelector('.mural');
+    const rolagemX = mural ? mural.scrollLeft : 0;
+    const rolagemY = mural ? mural.scrollTop : 0;
+    const n = criarCartao('nota','amarelo',{ x: rolagemX + 40, y: rolagemY + 40 });
+    estado.paginas[pgId].livres.push(n);
+    guardar(); desenharMural(pgId); atualizarContagens();
+    const el = dom[pgId].lona.querySelector(`.cartao[data-id="${n.id}"]`);
+    if (el) abrir(n, el);
+  }
+
+  function categoriaPadrao(titulo='') {
+    const t = titulo.toLowerCase();
+    if (t.includes('orç') || t.includes('orc')) return 'orcados';
+    if (t.includes('monitor') || t.includes('anális') || t.includes('analis') || t.includes('aguard')) return 'monitorados';
+    if (t.includes('extern')) return 'tarefas-externas';
+    if (t.includes('intern')) return 'tarefas-internas';
+    return 'orcados';
+  }
+
+  function concluir(pgId, id) {
+    const r = acharNoQuadro(pgId, id); if (!r || !r.coluna) return;
+    const pg = estado.paginas[pgId];
+    r.coluna.notas = r.coluna.notas.filter(n => n.id !== id);
+    let cat;
+    if (r.nota.tipo === 'orcamento') cat = (r.nota.categoria || categoriaPadrao(r.coluna.titulo));
+    else if (r.nota.tipo === 'pedido') cat = classificarPedido(r.nota);
+    else cat = classificarLembrete(r.coluna.titulo);
+    pg.concluidos.push(Object.assign({}, r.nota, {
+      colunaOrigem: r.coluna.titulo,
+      colunaOrigemId: r.coluna.id,
+      categoria: cat,
+      dataConclusao: hojeISO()
+    }));
+    limparSelecao(); guardar(); desenharColunas(pgId); atualizarContagens();
+  }
+  /* pedidos concluídos: classifica pela etapa em que o pedido estava */
+  function classificarPedido(n) {
+    const e = n.etapaAtual || 0;
+    return e >= 2 ? 'pedido-instalacao' : (e === 1 ? 'pedido-producao' : 'pedido-projeto');
+  }
+  /* para a página de lembretes (sem campo categoria), classifica pela coluna */
+  function classificarLembrete(titulo='') {
+    const t = titulo.toLowerCase();
+    if (t.includes('extern')) return 'tarefas-externas';
+    if (t.includes('intern')) return 'tarefas-internas';
+    if (t.includes('monitor')) return 'monitorados';
+    return 'tarefas-internas';
+  }
+
+  function excluir(pgId, id) {
+    const pg = estado.paginas[pgId];
+    if (pg.livres) pg.livres = pg.livres.filter(n => n.id !== id);
+    if (pg.colunas) pg.colunas.forEach(c => c.notas = c.notas.filter(n => n.id !== id));
+    limparSelecao(); guardar(); desenharPagina(pgId); atualizarContagens();
+  }
+
+  /* ============ barra de ferramentas por página ============ */
+  function ligarBarra(p) {
+    const d = dom[p.id];
+    const barra = d.barra;
+    const cores = barra.querySelector('[data-cores]');
+    Object.entries(PAPEIS).forEach(([chave, pp]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'cor'; b.style.background = pp.bg;
+      b.dataset.cor = chave; b.title = pp.nome;
+      b.setAttribute('aria-label','Cor '+pp.nome); b.setAttribute('aria-pressed','false');
+      b.addEventListener('click', () => {
+        const r = acharAtiva(selecionada); if (!r) return;
+        r.nota.cor = chave;
+        const el = elDoCartao(r.nota.id); if (el) aplicarEstilo(el, r.nota);
+        atualizarFerramentas(); guardar();
+      });
+      cores.appendChild(b);
+    });
+    barra.querySelector('[data-menor]').addEventListener('click', () => mudarFonte(-FONTE_PASSO));
+    barra.querySelector('[data-maior]').addEventListener('click', () => mudarFonte(+FONTE_PASSO));
+    barra.querySelector('[data-negrito]').addEventListener('click', () => {
+      const r = acharAtiva(selecionada); if (!r) return;
+      r.nota.negrito = !r.nota.negrito;
+      const el = elDoCartao(r.nota.id);
+      if (el){ const t = el.querySelector('.texto'); if (t) t.classList.toggle('negrito', r.nota.negrito); }
+      atualizarFerramentas(); guardar();
+    });
+    const bc = barra.querySelector('[data-concluir]');
+    if (bc) bc.addEventListener('click', () => { if (selecionada) concluir(p.id, selecionada); });
+    const bx = barra.querySelector('[data-excluir]');
+    if (bx) bx.addEventListener('click', () => { if (selecionada) excluir(p.id, selecionada); });
+
+    const abrirConc = barra.querySelector('[data-abrir-concluidos]');
+    if (abrirConc) abrirConc.addEventListener('click', () => {
+      d.quadro.hidden = true; d.telaConc.hidden = false; desenharConcluidos(p.id);
+    });
+    if (d.telaConc) d.telaConc.querySelector('[data-voltar]').addEventListener('click', () => {
+      d.telaConc.hidden = true; d.quadro.hidden = false;
+    });
+
+    // botão "novo" para o mural (nota) fica na dica; adicionamos um atalho na barra
+    if (p.tipo === 'nota') {
+      const extra = document.createElement('button');
+      extra.type = 'button'; extra.className = 'btn-concluidos';
+      extra.innerHTML = '<span aria-hidden="true">+</span> Nova nota';
+      extra.addEventListener('click', () => adicionarNota(p.id));
+      barra.lastElementChild.appendChild(extra);
+    }
+  }
+
+  function elDoCartao(id) {
+    const d = dom[estado.paginaAtiva];
+    const raiz = d.tipo === 'nota' ? d.lona : d.cols;
+    return raiz ? raiz.querySelector(`.cartao[data-id="${id}"]`) : null;
+  }
+  function mudarFonte(delta) {
+    const r = acharAtiva(selecionada); if (!r) return;
+    r.nota.fonte = Math.min(FONTE_MAX, Math.max(FONTE_MIN, (r.nota.fonte||15) + delta));
+    const el = elDoCartao(r.nota.id); if (el) aplicarEstilo(el, r.nota);
+    atualizarFerramentas(); guardar();
+  }
+  function atualizarFerramentas() {
+    const d = dom[estado.paginaAtiva];
+    const ferr = d.barra.querySelector('[data-ferr]');
+    const r = acharAtiva(selecionada);
+    ferr.classList.toggle('inativo', !r);
+    if (!r) return;
+    d.barra.querySelector('[data-tam]').textContent = r.nota.fonte || 15;
+    d.barra.querySelector('[data-negrito]').setAttribute('aria-pressed', String(!!r.nota.negrito));
+    $$('.cor', d.barra).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cor === r.nota.cor)));
+  }
+
+  /* ============ contagens (abas + badges) ============ */
+  function contarPagina(pgId) {
+    const pg = estado.paginas[pgId];
+    if (pg.livres) return pg.livres.length;
+    let n = 0; (pg.colunas||[]).forEach(c => n += c.notas.length);
+    return n;
+  }
+  function atualizarContagens() {
+    PAGINAS.forEach(p => {
+      const c = $(`[data-conta="${p.id}"]`); if (c) c.textContent = contarPagina(p.id);
+      const pg = estado.paginas[p.id];
+      const badge = dom[p.id].barra.querySelector('[data-badge]');
+      if (badge) badge.textContent = (pg.concluidos||[]).length;
+    });
+  }
+
+  /* ============ concluídos (agrupados por categoria) ============ */
+  function desenharConcluidos(pgId) {
+    const d = dom[pgId];
+    const cont = d.telaConc.querySelector('[data-gc]');
+    const pg = estado.paginas[pgId];
+    cont.innerHTML = '';
+    if (!pg.concluidos.length) {
+      const p = document.createElement('p'); p.className='vazio-concluidos';
+      p.textContent = 'Nenhum item concluído ainda.'; cont.appendChild(p); return;
+    }
+    const porCat = {};
+    pg.concluidos.forEach(item => { const k = item.categoria || 'orcados'; (porCat[k] || (porCat[k] = [])).push(item); });
+    Object.keys(CATEGORIAS).forEach(catId => {
+      const itens = porCat[catId]; if (!itens || !itens.length) return;
+      const cat = CATEGORIAS[catId];
+      const grupo = document.createElement('div'); grupo.className = 'grupo-cat';
+      const h3 = document.createElement('h3');
+      h3.style.background = cat.cor;
+      h3.innerHTML = `${cat.nome} <span class="n">${itens.length}</span>`;
+      grupo.appendChild(h3);
+      const lista = document.createElement('div'); lista.className='itens-concluidos';
+      [...itens].reverse().forEach(item => lista.appendChild(desenharItemConcluido(item, pgId)));
+      grupo.appendChild(lista);
+      cont.appendChild(grupo);
+    });
+  }
+  function desenharItemConcluido(item, pgId) {
+    const linha = document.createElement('div'); linha.className='item-concluido';
+    const ponto = document.createElement('span'); ponto.className='ponto-cor';
+    ponto.style.setProperty('--dot', (PAPEIS[item.cor]||PAPEIS.amarelo).bg);
+    linha.appendChild(ponto);
+    const conteudo = document.createElement('div'); conteudo.className='conteudo-item';
+    if (item.cliente){ const c = document.createElement('p'); c.className='cliente-item'; c.textContent = item.cliente; conteudo.appendChild(c); }
+    const pTxt = document.createElement('p'); pTxt.className='texto-item';
+    pTxt.textContent = item.texto && item.texto.trim() ? item.texto : '(sem texto)';
+    conteudo.appendChild(pTxt);
+    const origem = document.createElement('span'); origem.className='origem-item';
+    origem.textContent = item.colunaOrigem || '';
+    conteudo.appendChild(origem);
+    linha.appendChild(conteudo);
+    const acoes = document.createElement('div'); acoes.className='acoes-item';
+    const btnR = document.createElement('button'); btnR.type='button'; btnR.title='Restaurar ao quadro';
+    btnR.setAttribute('aria-label','Restaurar'); btnR.textContent='↺';
+    btnR.addEventListener('click', () => restaurar(pgId, item.id));
+    const btnX = document.createElement('button'); btnX.type='button'; btnX.className='btn-excluir-def';
+    btnX.title='Excluir definitivamente'; btnX.setAttribute('aria-label','Excluir'); btnX.textContent='🗑';
+    btnX.addEventListener('click', () => excluirDefinitivo(pgId, item.id));
+    acoes.append(btnR, btnX);
+    linha.appendChild(acoes);
+    return linha;
+  }
+  function restaurar(pgId, id) {
+    const pg = estado.paginas[pgId];
+    const i = pg.concluidos.findIndex(it => it.id === id); if (i<0) return;
+    const item = pg.concluidos.splice(i,1)[0];
+    const col = pg.colunas.find(c => c.id === item.colunaOrigemId) || pg.colunas[0];
+    const limpo = Object.assign({}, item);
+    delete limpo.colunaOrigem; delete limpo.colunaOrigemId; delete limpo.dataConclusao;
+    col.notas.push(limpo);
+    guardar(); desenharConcluidos(pgId); atualizarContagens();
+  }
+  function excluirDefinitivo(pgId, id) {
+    const pg = estado.paginas[pgId];
+    pg.concluidos = pg.concluidos.filter(it => it.id !== id);
+    guardar(); desenharConcluidos(pgId); atualizarContagens();
+  }
+
+  /* ============ clique-fora / teclado ============ */
+  document.addEventListener('pointerdown', e => {
+    if (e.target.closest('.cartao') || e.target.closest('.ferramentas') || e.target.closest('.aba')) return;
+    limparSelecao();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') limparSelecao();
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selecionada && !editando) {
+      const def = PAGINAS.find(p => p.id === estado.paginaAtiva);
+      if (!def) return;
+      e.preventDefault();
+      if (def.tipo === 'nota') excluir(estado.paginaAtiva, selecionada);
+      else concluir(estado.paginaAtiva, selecionada);
+    }
+  });
+
+  /* ============ arraste ============ */
+  let arraste = null;
+  let fimDoArraste = 0;
+  const vaga = document.createElement('div');
+  vaga.className = 'vaga';
+
+  function prepararArraste(e, n, el, pgId) {
+    if (e.target.closest('.linha-data') || e.target.closest('.linha-link') ||
+        e.target.closest('.linha-entrega') || e.target.closest('.etapas')) return;
+    if (e.button !== undefined && e.button !== 0) return;
+    const naAlca = !!e.target.closest('.alca');
+    if (editando === n.id && !naAlca) return;
+    if (e.pointerType !== 'mouse' && !naAlca) return;
+    // no campo cliente (contentEditable), só arrasta pela alça
+    if (e.target.closest('.campo-cliente') && !naAlca) return;
+
+    const modoLivre = dom[pgId].tipo === 'nota';
+    const r = el.getBoundingClientRect();
+    arraste = {
+      id:n.id, nota:n, el, pgId, modoLivre, ativo:false, ponteiro:e.pointerId,
+      x0:e.clientX, y0:e.clientY, dx:e.clientX - r.left, dy:e.clientY - r.top,
+      larg:r.width, alt:r.height, fantasma:null
+    };
+    if (naAlca) e.preventDefault();
+    addEventListener('pointermove', moverArraste);
+    addEventListener('pointerup', soltarArraste);
+    addEventListener('pointercancel', soltarArraste);
+  }
+
+  function iniciar() {
+    const { el, larg, alt, modoLivre } = arraste;
+    if (modoLivre) {
+      // no mural, arrastamos o próprio elemento (posição absoluta)
+      el.style.zIndex = 500;
+      el.classList.add('arrastando-livre');
+      arraste.ativo = true;
+      limparSelecao();
+      document.body.classList.add('arrastando');
+      return;
+    }
+    const g = el.cloneNode(true);
+    g.classList.add('fantasma');
+    g.classList.remove('selecionado','editando');
+    g.style.width = larg + 'px'; g.style.height = alt + 'px';
+    document.body.appendChild(g);
+    arraste.fantasma = g;
+    vaga.style.height = alt + 'px';
+    el.parentNode.insertBefore(vaga, el);
+    el.classList.add('origem');
+    document.body.classList.add('arrastando');
+    arraste.ativo = true;
+    limparSelecao();
+  }
+
+  function moverArraste(e) {
+    if (!arraste) return;
+    if (!arraste.ativo) {
+      if (Math.hypot(e.clientX - arraste.x0, e.clientY - arraste.y0) < 6) return;
+      iniciar();
+    }
+    e.preventDefault();
+    if (arraste.modoLivre) {
+      const mural = dom[arraste.pgId].quadro.querySelector('.mural');
+      const rMural = mural.getBoundingClientRect();
+      let x = e.clientX - rMural.left + mural.scrollLeft - arraste.dx;
+      let y = e.clientY - rMural.top  + mural.scrollTop  - arraste.dy;
+      x = Math.max(0, x); y = Math.max(0, y);
+      arraste.el.style.left = x + 'px';
+      arraste.el.style.top  = y + 'px';
+      arraste.ultimoX = x; arraste.ultimoY = y;
+      return;
+    }
+    arraste.fantasma.style.left = (e.clientX - arraste.dx) + 'px';
+    arraste.fantasma.style.top  = (e.clientY - arraste.dy) + 'px';
+    posicionarVaga(e.clientX, e.clientY);
+    rolarBorda(e.clientY);
+  }
+
+  function colunaSob(x, y) {
+    const cols = $$('.coluna', dom[arraste.pgId].cols);
+    const dentro = cols.find(c => {
+      const r = c.getBoundingClientRect();
+      return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom;
+    });
+    if (dentro) return dentro;
+    let melhor=null, dist=Infinity;
+    cols.forEach(c => {
+      const r = c.getBoundingClientRect();
+      const d = Math.hypot(x-(r.left+r.width/2), y-(r.top+r.height/2));
+      if (d<dist){ dist=d; melhor=c; }
+    });
+    return melhor;
+  }
+  function posicionarVaga(x, y) {
+    const col = colunaSob(x, y); if (!col) return;
+    const grade = col.querySelector('.grade');
+    const cartoes = $$('.cartao', grade).filter(el => el !== arraste.el);
+    let ref = null;
+    for (const el of cartoes) {
+      const r = el.getBoundingClientRect();
+      if (y < r.top + r.height/2){ ref = el; break; }
+    }
+    grade.insertBefore(vaga, ref || grade.querySelector('.adicionar'));
+    const elVazia = grade.querySelector('.vazia'); if (elVazia) elVazia.remove();
+  }
+  function rolarBorda(y) {
+    const m = 70;
+    if (y < m) scrollBy({ top:-14 });
+    else if (y > innerHeight - m) scrollBy({ top:14 });
+  }
+
+  function soltarArraste() {
+    removeEventListener('pointermove', moverArraste);
+    removeEventListener('pointerup', soltarArraste);
+    removeEventListener('pointercancel', soltarArraste);
+    if (!arraste) return;
+    const a = arraste; arraste = null;
+    if (!a.ativo) return;
+    fimDoArraste = Date.now();
+    document.body.classList.remove('arrastando');
+
+    if (a.modoLivre) {
+      a.el.classList.remove('arrastando-livre');
+      a.el.style.zIndex = '';
+      a.nota.x = Math.round(a.ultimoX != null ? a.ultimoX : a.nota.x);
+      a.nota.y = Math.round(a.ultimoY != null ? a.ultimoY : a.nota.y);
+      guardar();
+      return;
+    }
+
+    a.fantasma.remove();
+    a.el.classList.remove('origem');
+    const grade = vaga.parentNode;
+    if (grade) {
+      const pg = estado.paginas[a.pgId];
+      const destino = pg.colunas.find(c => c.id === grade.dataset.grade);
+      const ordem = $$('.cartao, .vaga', grade).filter(el => (el.classList.contains('cartao') && el !== a.el) || el === vaga);
+      const indice = ordem.indexOf(vaga);
+      const orig = acharNoQuadro(a.pgId, a.id).coluna;
+      orig.notas = orig.notas.filter(n => n.id !== a.id);
+      destino.notas.splice(Math.max(0, indice), 0, a.nota);
+    }
+    vaga.remove();
+    guardar();
+    desenharColunas(a.pgId);
+    atualizarContagens();
+  }
+
+  /* ============ verificação diária de vencimento ============ */
+  let ultimaData = hojeISO();
+  setInterval(() => {
+    const h = hojeISO();
+    if (h !== ultimaData){ ultimaData = h; desenharPagina(estado.paginaAtiva); }
+  }, 60000);
+
+  /* ============ partida ============ */
+  /* Monta e desenha de forma SÍNCRONA com o estado padrão, para o painel
+     aparecer na hora em qualquer ambiente. Em seguida, recupera o que já
+     havia sido salvo (localStorage é síncrono; window.storage é async) e
+     redesenha se encontrar algo mais recente. */
+  function partir() {
+    montarPaginas();
+
+    // 1) recuperação síncrona imediata (localStorage)
+    const local = maisRecente([cofre.lerLocal(CHAVE)]);
+    if (local) { estado = migrar(local); }
+    carregado = true;
+    mostrarEstado('ok', estado.salvoEm);
+
+    trocarPagina(estado.paginaAtiva);
+    atualizarContagens();
+
+    // 2) recuperação da nuvem (async) — só sobrescreve se for mais recente
+    if (cofre.temNuvem) {
+      cofre.lerNuvem(CHAVE).then(txtNuvem => {
+        const daNuvem = maisRecente([txtNuvem]);
+        if (daNuvem && (daNuvem.salvoEm || 0) > (estado.salvoEm || 0)) {
+          estado = migrar(daNuvem);
+          montarPaginas();
+          trocarPagina(estado.paginaAtiva);
+          atualizarContagens();
+        }
+        // deixa as duas cópias iguais
+        const texto = JSON.stringify(estado);
+        cofre.gravarLocal(CHAVE, texto);
+        cofre.gravarNuvem(CHAVE, texto);
+      }).catch(()=>{});
+    } else if (!cofre.temLocal) {
+      mostrarEstado('erro');
+    } else {
+      // primeiro uso sem nuvem: grava o padrão
+      if (!local) guardar();
+    }
+  }
+
+  partir();
+})();
+
+
+
+
+
+</script>
+</body>
+</html>
